@@ -1,3 +1,7 @@
 Rails.application.routes.draw do
-    root 'requests#index'
+    post '/photos', to: 'requests#savePhotosToDB'
+    post '/getPins', to: 'requests#getPins'
+    post '/login', to: 'requests#login'
+    post '/create', to: 'requests#create'
+    post '/getARPhotos', to: 'requests#getARPhotos'
 end
