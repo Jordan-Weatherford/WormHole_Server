@@ -5,16 +5,12 @@ class RequestsController < ApplicationController
     require 'aws-sdk'
     require 'tempfile'
     require 'bcrypt'
-
-    # @@access_key_id = "AKIAIF7LWN4YKUH7NIBQ"
-    # @@secret_access_key = "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"
+    require 'figaro'
 
 
     def getPins
 # s3 call to bucket and credentials
         s3 = Aws::S3::Resource.new(
-            # access_key_id: @@access_key_id,
-            # secret_access_key: @@secret_access_key,
             access_key_id: ENV["aws_access_key_id"],
             secret_access_key: ENV["aws_secret_access_key"],
             region: 'us-west-2'
@@ -134,8 +130,6 @@ class RequestsController < ApplicationController
     def getARPhotos
 # s3 call to bucket and credentials
         s3 = Aws::S3::Resource.new(
-            # access_key_id: @@access_key_id,
-            # secret_access_key: @@secret_access_key,
             access_key_id: ENV["aws_access_key_id"],
             secret_access_key: ENV["aws_secret_access_key"],
             region: 'us-west-2'
@@ -226,8 +220,6 @@ class RequestsController < ApplicationController
     def savePhotosToDB
 # s3 call to bucket and credentials
         s3 = Aws::S3::Resource.new(
-            # access_key_id: @@access_key_id,
-            # secret_access_key: @@secret_access_key,
             access_key_id: ENV["aws_access_key_id"],
             secret_access_key: ENV["aws_secret_access_key"],
             region: 'us-west-2'
