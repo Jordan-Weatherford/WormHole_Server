@@ -6,20 +6,22 @@ class RequestsController < ApplicationController
     require 'tempfile'
     require 'bcrypt'
 
-    @@access_key_id = "AKIAIOI2R25CZF3XM7JQ"
-    @@secret_access_key = "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"
+    # @@access_key_id = "AKIAIF7LWN4YKUH7NIBQ"
+    # @@secret_access_key = "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"
 
 
     def getPins
 # s3 call to bucket and credentials
         s3 = Aws::S3::Resource.new(
-            access_key_id: @@access_key_id,
-            secret_access_key: @@secret_access_key,
+            # access_key_id: @@access_key_id,
+            # secret_access_key: @@secret_access_key,
+            access_key_id: ENV["aws_access_key_id"],
+            secret_access_key: ENV["aws_secret_access_key"],
             region: 'us-west-2'
         )
 
 # instantiate array to hold hashes which contain info for each annotation
-        pins_to_phone = Hash.new
+        pins_to_phone = Array.new
         bucket = s3.bucket('cache-app-bucket')
 
 # grab all photos from database within set range from users current location
@@ -32,94 +34,115 @@ class RequestsController < ApplicationController
 
 # get username and likes for pin
             username = User.find(pin.user_id).username
-            likes = Like.where(:photo_id => pin.id).count
-
-            # pins_to_phone["photo-id-key"] = { "long" => "blah blah" }
-# append all info to array to be sent to phone as json
-            pins_to_phone[pin.id.to_s] = {
+            likes = Like.where(:photo_id => pin.id)
+# add info to hash to be sent to phone as json
+            pins_to_phone.append({
+                "photo_key" => pin.id.to_s,
                 "longitude" => pin.longitude,
                 "latitude" => pin.latitude,
                 "altitude" => pin.altitude,
                 "user_id" => pin.user_id,
                 "created_at" => pin.created_at,
                 "username" => username,
-                "likes" => likes,
+                "likes" => likes.count,
                 "pages" => [],
-                "cover" => true,
-            }
+            })
+
         end
 
-
-# cluster pins
-        # i = 0
-        # while i < pins_to_phone.count
-        pins_to_phone.each do |key1, value1|
-
-            # j = 0
-            # while j < pins_to_phone.count
-            pins_to_phone.each do |key2, value2|
-# if loops are on the pin, move to next loop
-                if pins_to_phone[key1] == pins_to_phone[key2]
-                    # j += 1
+# cluster pins!
+        i = 0
+        while i < pins_to_phone.count
+            j = 0
+            while j < pins_to_phone.count
+                if i == j
+                    j += 1
                     next
                 end
 
-                # longDistance = pins_to_phone[i]["longitude"] - pins_to_phone[j]["longitude"]
-                # latDistance = pins_to_phone[i]["latitude"] - pins_to_phone[j]["latitude"]
-                latDistance = pins_to_phone[key1]["latitude"] - pins_to_phone[key2]["latitude"]
-                longDistance = pins_to_phone[key1]["longitude"] - pins_to_phone[key2]["longitude"]
+                if pins_to_phone[j]["pages"].count > 0
+                    j += 1
+                    next
+                end
 
+                latDistance = pins_to_phone[i]["latitude"] - pins_to_phone[j]["latitude"]
+                longDistance = pins_to_phone[i]["longitude"] - pins_to_phone[j]["longitude"]
 
-                if longDistance.between?(-0.0005, 0.05) && latDistance.between?(-0.0008, 0.0008)
-# close enough to cluster
-                    if pins_to_phone[key1]["likes"] > pins_to_phone[key2]["likes"]
-                        pins_to_phone[key2]["cover"] = false
-                        pins_to_phone[key1]["pages"].append(pins_to_phone[key2])
-                        pins_to_phone.delete(key2)
-                    else
-                        pins_to_phone[key1]["cover"] = false
-                        pins_to_phone[key2]["pages"].append(pins_to_phone[key1])
-                        pins_to_phone.delete(key1)
+                if longDistance.between?(-0.005, 0.005) && latDistance.between?(-0.0008, 0.0008)
+                    if pins_to_phone[i]["likes"] > pins_to_phone[j]["likes"]
+                        winner = 1
+                    end
+
+                    if pins_to_phone[j]["likes"] > pins_to_phone[i]["likes"]
+                        winner = 2
+                    end
+
+                    if pins_to_phone[i]["likes"] == pins_to_phone[j]["likes"]
+                        if pins_to_phone[i]["created_at"] > pins_to_phone[j]["created_at"]
+                            winner = 1
+                        else
+                            winner = 2
+                        end
+                    end
+
+                    if winner == 1
+                        pins_to_phone[j]["pages"].each do |page|
+                            pins_to_phone[i]["pages"].append(page)
+                        end
+
+                        pins_to_phone[i]["pages"].append(pins_to_phone[j]["photo_key"])
+
+                        pins_to_phone.delete_at(j)
+                        next
+                    else   #2 wins
+                        pins_to_phone[i]["pages"].each do |page|
+                            pins_to_phone[j]["pages"].append(page)
+                        end
+
+                        pins_to_phone[j]["pages"].append(pins_to_phone[i]["photo_key"])
+
+                        pins_to_phone.delete_at(i)
+                        i -= i
+                        break
                     end
                 end
+                j += 1
             end
+            i += 1
         end
 
-        puts("-"*90)
-        puts(pins_to_phone)
-        puts("-"*90)
+# turn pins to phone array in to pins hash to be sent to phone
+        pins_hash = Hash.new
 
-        render :json => pins_to_phone
+        pins_to_phone.each do |pin|
+            pins_hash[pin["photo_key"]] = {
+                "longitude" => pin["longitude"],
+                "latitude" => pin["latitude"],
+                "altitude" => pin["altitude"],
+                "user_id" => pin["user_id"],
+                "created_at" => pin["created_at"],
+                "username" => pin["username"],
+                "likes" => pin["likes"],
+                "pages" => pin["pages"],
+            }
+        end
+        render :json => pins_hash
     end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
     def getARPhotos
 # s3 call to bucket and credentials
         s3 = Aws::S3::Resource.new(
-            access_key_id: @@access_key_id,
-            secret_access_key: @@secret_access_key,
+            # access_key_id: @@access_key_id,
+            # secret_access_key: @@secret_access_key,
+            access_key_id: ENV["aws_access_key_id"],
+            secret_access_key: ENV["aws_secret_access_key"],
             region: 'us-west-2'
         )
+        bucket = s3.bucket('cache-app-bucket')
 
         pins_to_phone = Hash.new
-        bucket = s3.bucket('cache-app-bucket')
 
 
         params["pins"].each do |id|
@@ -127,23 +150,86 @@ class RequestsController < ApplicationController
             photo = bucket_item_object.get().body
             photo.each do |img|
                 pins_to_phone[id.to_s] = img
-                # pins_to_phone[id.to_s] = "img goes here"
             end
         end
-
-        puts("-"*100)
-        # puts(pins_to_phone)
-        puts("-"*100)
         render :json => pins_to_phone
     end
+
+
+
+    def getFullSizePhotos
+# s3 call to bucket and credentials
+        s3 = Aws::S3::Resource.new(
+            # access_key_id: @@access_key_id,
+            # secret_access_key: @@secret_access_key,
+            access_key_id: ENV["aws_access_key_id"],
+            secret_access_key: ENV["aws_secret_access_key"],
+            region: 'us-west-2'
+        )
+        bucket = s3.bucket('cache-app-bucket')
+
+        album_images = []
+
+        # loop through each photo key sent from phone and add info
+        params[:keys].each do |photo_id|
+            # grab photo from s3
+            bucket_item_object = bucket.object(photo_id)
+            photo = bucket_item_object.get().body
+            photo.each do |img|
+                @image = img
+            end
+
+            # grab likes
+            @likes = Like.where(photo_id: photo_id).count
+
+            # grab username
+            photo = Photo.find(photo_id.to_i)
+            user = photo.user_id
+
+            @username = User.find(user).username
+            # grab created_at
+            @date = photo.created_at
+
+            # create hash for each album entry and add to 'photos_with_info' array to render to phone as json
+            album_images.append({
+                "photo_id" => photo_id,
+                "image" => @image,
+                "likes" => @likes.to_s,
+                "username" => @username,
+                "created_at" => @date,
+                })
+
+        end
+
+# sort by likes
+        swapped = true
+        while (swapped)
+            swapped = false
+            for i in 0..album_images.count - 1
+                if (i+1 < album_images.count)
+                    if (album_images[i+1]["likes"] > album_images[i]["likes"])
+                        temp = album_images[i+1]
+                        album_images[i+1] = album_images[i]
+                        album_images[i] = temp
+
+                        swapped = true
+                    end
+                end
+            end
+        end
+        render :json => album_images
+    end
+
 
 
 
     def savePhotosToDB
 # s3 call to bucket and credentials
         s3 = Aws::S3::Resource.new(
-            access_key_id: @@access_key_id,
-            secret_access_key: @@secret_access_key,
+            # access_key_id: @@access_key_id,
+            # secret_access_key: @@secret_access_key,
+            access_key_id: ENV["aws_access_key_id"],
+            secret_access_key: ENV["aws_secret_access_key"],
             region: 'us-west-2'
         )
 
@@ -170,8 +256,8 @@ class RequestsController < ApplicationController
             tempfile.close
             tempfile.unlink
         end
-        puts("-"*90)
     end
+
 
 
     def login
@@ -220,4 +306,29 @@ class RequestsController < ApplicationController
 
         render :json => response
     end
+
+
+    def createLike
+        response = Hash.new
+        response["result"] = "success"
+
+        user_id = User.where(username: params["username"]).first.id
+        photo_id = Photo.find(params[:photo_id]).id
+        like = Like.create(user_id: user_id, photo_id: photo_id)
+
+        @likes = Like.where(photo_id: photo_id).count
+
+        if (like.id)
+            response["result"] = true
+            response["photo_id"] = photo_id
+            response["likes"] = @likes.to_s
+        else
+            response["result"] = false
+        end
+
+        render :json => response
+    end
+
+
+
 end
