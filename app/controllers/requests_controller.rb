@@ -320,7 +320,4 @@ class RequestsController < ApplicationController
 
         render :json => response
     end
-
-
-
 end
