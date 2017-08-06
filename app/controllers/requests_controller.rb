@@ -5,14 +5,17 @@ class RequestsController < ApplicationController
     require 'aws-sdk'
     require 'tempfile'
     require 'bcrypt'
-    require 'figaro'
+
+    @@aws_access_key_id = ""
+    @@aws_secret_access_key = ""
+
 
 
     def getPins
 # s3 call to bucket and credentials
         s3 = Aws::S3::Resource.new(
-            access_key_id: ENV["aws_access_key_id"],
-            secret_access_key: ENV["aws_secret_access_key"],
+            access_key_id: @@aws_access_key_id,
+            secret_access_key: @@aws_secret_access_key,
             region: 'us-west-2'
         )
 
@@ -130,8 +133,8 @@ class RequestsController < ApplicationController
     def getARPhotos
 # s3 call to bucket and credentials
         s3 = Aws::S3::Resource.new(
-            access_key_id: ENV["aws_access_key_id"],
-            secret_access_key: ENV["aws_secret_access_key"],
+            access_key_id: @@aws_access_key_id,
+            secret_access_key: @@aws_secret_access_key,
             region: 'us-west-2'
         )
         bucket = s3.bucket('cache-app-bucket')
@@ -156,8 +159,8 @@ class RequestsController < ApplicationController
         s3 = Aws::S3::Resource.new(
             # access_key_id: @@access_key_id,
             # secret_access_key: @@secret_access_key,
-            access_key_id: ENV["aws_access_key_id"],
-            secret_access_key: ENV["aws_secret_access_key"],
+            access_key_id: @@aws_access_key_id,
+            secret_access_key: @@aws_secret_access_key,
             region: 'us-west-2'
         )
         bucket = s3.bucket('cache-app-bucket')
@@ -220,8 +223,8 @@ class RequestsController < ApplicationController
     def savePhotosToDB
 # s3 call to bucket and credentials
         s3 = Aws::S3::Resource.new(
-            access_key_id: ENV["aws_access_key_id"],
-            secret_access_key: ENV["aws_secret_access_key"],
+            access_key_id: @@aws_access_key_id,
+            secret_access_key: @@aws_secret_access_key,
             region: 'us-west-2'
         )
 
